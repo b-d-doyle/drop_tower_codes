@@ -1,6 +1,20 @@
 //GRIT code
 //Wesley Chambers
 //20 July 2018
+//
+//29 September 2025
+//Modification by Brandon Doyle:
+//  - Falling event now triggers on falling edge of contact_pin_sig, not
+//    simply logical LOW. This is to avoid immediately firing the solenoid if
+//    someone should accidentally flip the arm switch before mounting GRIT.
+//  - 4 minute cooldown replaced with infinite while loop. Is there a reason
+//    we were letting GRIT reset itself? Maybe there is and I just haven't
+//    thought of it! But if not, let's not let it do that, IMO.
+
+
+//Macros for detecing signal rising/falling edges. Added by Brandon.
+//#define RE(signal, state) (state=(state<<1)|(signal&1)&3)==1 //Rising edge. Unused. Uncomment if needed.
+#define FE(signal, state) (state=(state<<1)|(signal&1)&3)==2   //Falling edge.
 
 //Pin assignments
 
@@ -14,6 +28,10 @@ int contact_pin_gnd = 9;
 
 int armed_pin_LED = 4;
 int contact_pin_LED = 3;
+
+// Brandon moved these out of the loop:
+bool ARMED_LOGIC   = false;
+bool CONTACT_LOGIC = false;
 
 
 
@@ -45,13 +63,9 @@ void setup() {
 }
 
 void loop() {
-   
-  bool ARMED_LOGIC   = 0;
-  bool CONTACT_LOGIC = 0;
-
     // Read armed and contact logic
   ARMED_LOGIC   = digitalRead(armed_pin_sig);
-  CONTACT_LOGIC = digitalRead(contact_pin_sig);
+  CONTACT_LOGIC = digitalRead(contact_pin_sig); //This is still okay even with my edits because we're not in the while loop yet. -Brandon
 
     // Show Logic by print and LED
   Serial.print("Armed Logic:");
@@ -75,12 +89,12 @@ void loop() {
     
       // Read armed and contact logic
        ARMED_LOGIC   = digitalRead(armed_pin_sig);
-       CONTACT_LOGIC = digitalRead(contact_pin_sig);  
+       //CONTACT_LOGIC = digitalRead(contact_pin_sig);  //Now handled in Falling Edge detection -Brandon
 
        digitalWrite(armed_pin_LED,  HIGH);
-    
-         // Falling event (false means its not in contact)
-       if(CONTACT_LOGIC==false){
+       
+       // Falling event: triggers on falling edge (hehe) of signal from contact_pin_sig
+       if( FE(digitalRead(contact_pin_sig),CONTACT_LOGIC) ){ // FE() stores current state and checks for falling edge
               //Activating Launcher
             delay(50);
             digitalWrite(relay_pin_out,   HIGH); 
@@ -89,7 +103,8 @@ void loop() {
             delay(150);
             digitalWrite(relay_pin_out, LOW);
 
-            delay(240000);   // 4 min cooldown (enough time to turn off the arm or power switch)
+            //delay(240000);   // 4 min cooldown (enough time to turn off the arm or power switch)
+            while(true);       // infinity min cooldown. Just Brandon's suggestion, take or leave :)
     }
   } 
   
